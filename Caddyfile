@@ -1,0 +1,22 @@
+{
+  auto_https disable_redirects
+}
+
+localhost {
+  encode gzip
+  tls internal
+
+  @api path /api/*
+  handle @api {
+    reverse_proxy http://backend-gateway:4000
+  }
+
+  @gql path /graphql*
+  handle @gql {
+    reverse_proxy http://backend-gateway:4000
+  }
+
+  handle {
+    reverse_proxy http://host.docker.internal:9010
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "realm": "atlas",
+  "enabled": true,
+  "registrationAllowed": true,
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Atlas",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["admin", "default-roles-atlas"]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Atlas",
+      "lastName": "User",
+      "credentials": [{ "type": "password", "value": "user", "temporary": false }],
+      "realmRoles": ["user", "default-roles-atlas"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin" },
+      { "name": "user" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "atlas-gateway",
+      "name": "Atlas Gateway",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["https://localhost/*", "http://localhost:*/*"],
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "post.logout.redirect.uris": "*"
+      }
+    }
+  ]
+}

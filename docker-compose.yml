@@ -1,0 +1,121 @@
+version: "3.8"
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+  kafka:
+    image: confluentinc/cp-kafka:7.5.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+      POSTGRES_DB: atlas_ledger
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  backend-gateway:
+    build: ./backend/gateway
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - PORT=4000
+      - CORS_ORIGIN=*
+      - FRAUD_GRPC_ADDR=${FRAUD_GRPC_ADDR:-fraud-service:50051}
+      # Use Atlas for Mongo (Hybrid). You can comment these two lines to fall back to local mongo.
+      - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
+      - MONGO_DB=${MONGO_DB:-atlas_bank}
+      # Postgres (use internal postgres service for consistency)
+      - PG_HOST=${PG_HOST:-postgres}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_DATABASE=${PG_DATABASE:-atlas_ledger}
+      - PG_USER=${PG_USER:-atlas}
+      - PG_PASSWORD=${PG_PASSWORD:-atlas}
+      # Auth (enabled by default now; set AUTH_ENABLED=false to disable)
+      - AUTH_ENABLED=${AUTH_ENABLED:-true}
+      - OIDC_ISSUER=${OIDC_ISSUER:-http://localhost:8443/realms/atlas}
+      - OIDC_AUDIENCE=${OIDC_AUDIENCE:-atlas-gateway}
+    depends_on:
+      - kafka
+      - redis
+      - mongo
+      - fraud-service
+    ports:
+      - "4000:4000"
+  ledger-service:
+    build: ./backend/ledger-service
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      # Postgres (use internal postgres service for consistency)
+      - PG_HOST=${PG_HOST:-postgres}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_USER=${PG_USER:-atlas}
+      - PG_PASSWORD=${PG_PASSWORD:-atlas}
+      - PG_DATABASE=${PG_DATABASE:-atlas_ledger}
+      - REDIS_URL=redis://redis:6379
+      # Use Atlas for Mongo (Hybrid). You can comment these two lines to fall back to local mongo.
+      - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017}
+      - MONGO_DB=${MONGO_DB:-atlas_bank}
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+      - mongo
+  fraud-service:
+    build: ./backend/fraud-service
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - kafka
+      - redis
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev --http-port=8443 --hostname-strict=false --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "8443:8443"
+  caddy:
+    image: caddy:2
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend-gateway
+volumes:
+  pgdata: {}
+  mongodata: {}

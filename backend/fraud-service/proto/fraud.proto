@@ -1,0 +1,26 @@
+syntax = "proto3";
+package fraud;
+
+service FraudService {
+  rpc AssessPayment (PaymentRequest) returns (FraudDecision);
+  rpc AssessCard (CardRequest) returns (FraudDecision);
+}
+
+message PaymentRequest {
+  double amount = 1;
+  string fromAccount = 2;
+  string toAccount = 3;
+}
+
+message CardRequest {
+  double amount = 1;
+  string merchant = 2;
+  string cardType = 3;
+  string last4 = 4;
+}
+
+message FraudDecision {
+  bool approved = 1;
+  int32 riskScore = 2;
+  string reason = 3;
+}
